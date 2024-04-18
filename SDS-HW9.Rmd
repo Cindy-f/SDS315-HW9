@@ -1,0 +1,238 @@
+---
+author: "Zhou Fan"
+date: "2024-04-17"
+output: html_document
+---
+
+### SDS315-HW9
+### Name: Zhou Fan
+### UT EID: zf2949
+### Github link: https://github.com/Cindy-f/SDS315-HW9.git
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(mosaic)
+library(stringr)
+library(kableExtra)
+library(ggplot2)
+library(kableExtra)
+library(knitr)
+library(MatchIt)
+library(dplyr)
+library(boot)
+
+turnout <- read.csv('turnout.csv')
+solder <- read.csv('solder.csv')
+```
+
+#### Problem 1: Get out the vote
+
+##### Part A: How much more likely are GOTV call recipients to have voted in 1998? 
+```{r, echo=FALSE}
+prop(voted1998 ~ GOTV_call, data = turnout)
+
+boot_voted1998_GOTV = do(10000)*diffprop(voted1998 ~ GOTV_call, data=mosaic::resample(turnout))
+
+confint(boot_voted1998_GOTV, level = 0.95)
+```
+The proportion of those receiving a GOTV call who voted in 1998 is 0.648, and the proportion of those not receiving a GOTV call who voted in 1998 is 0.444. The 95% confidence interval for the difference in these two proportions is roughly (0.143, 0.264).
+
+##### Part B: Consider the voted1996, AGE, and MAJORPTY variables. Provide evidence that at all three of these variables are confounders that prevent the difference you observed in Part A from representing the true causal effect of the GOTV call on the likelihood that a person voted in 1998. 
+
+(1) voted1996: 
+
+```{r, echo=FALSE}
+
+ggplot(turnout, aes(x = factor(GOTV_call), fill = factor(voted1996))) +
+  geom_bar(position = "fill") +
+  labs(title = "Proportion of Voted in 1996 by GOTV Call Status", x = "GOTV Call", y = "Proportion")
+
+ggplot(turnout, aes(x = factor(voted1998), fill = factor(voted1996))) +
+  geom_bar(position = "fill") +
+  labs(title = "Proportion of Voted in 1996 by whether voted in 1998", x = "voted1998", y = "Proportion")
+```
+The two boxplots above suggest that voted1996 is a confounder variable as it affect both GOTV call status and whether voted in 1998.
+
+(2) AGE:
+```{r, echo=FALSE}
+t.test(AGE ~ GOTV_call, data = turnout)
+t.test(AGE ~ voted1998, data = turnout)
+
+ggplot(turnout, aes(x = factor(GOTV_call), y = AGE)) + 
+  geom_boxplot() +
+  labs(title = "Boxplot of Age by GOTV Call Status", x = "GOTV Call", y = "Age")
+
+ggplot(turnout, aes(x = factor(voted1998), y = AGE)) + 
+  geom_boxplot() +
+  labs(title = "Boxplot of Age by whether voted in 1998 or not", x = "voted1998", y = "Age")
+```
+The above t-tests (with p value smaller than 0.05) suggest that age is a confouder variable because age influences both the likelihood to receive a GOTV call and the likelyhood to have voted in 1998. From the two boxplots we can see different ages have influences on both the GOTV call status and whether voted in 1998. 
+
+(3) MAJORPTY: 
+
+```{r, echo=FALSE}
+
+ggplot(turnout, aes(x = factor(GOTV_call), fill = factor(MAJORPTY))) +
+  geom_bar(position = "fill") +
+  labs(title = "Proportion of Major Party Registration by GOTV Call Status", x = "GOTV Call", y = "Proportion")
+
+ggplot(turnout, aes(x = factor(voted1998), fill = factor(MAJORPTY))) +
+  geom_bar(position = "fill") +
+  labs(title = "Proportion of Major Party Registration by whether voted in 1998", x = "voted1998", y = "Proportion")
+
+```
+The two boxplots above suggest that MAJORPTY is a confounder variable because it affect both GOTV call status and whether voted in 1998.
+
+##### Part C:
+
+Construct the matched dataset and provide evidence that it is balanced with respect to three confounders:
+```{r, echo = FALSE}
+# Construct the matched dataset: 
+turnout_match = matchit(GOTV_call ~ AGE + factor(voted1996) + factor(MAJORPTY), data = turnout, ratio = 5)
+
+# check that 'voted1996', 'AGE', and 'MAJORPTY' are no longer confounders:
+summary(turnout_match)
+```
+
+Repeat analysis from Part A using the matched dataset: 
+```{r}
+turnout_matched = match.data(turnout_match)
+# use the matched dataset to calculate some statistics from Part A: 
+prop(voted1998 ~ GOTV_call, data = turnout_matched)
+
+boot_voted1998_GOTV_matched = do(10000)*diffprop(voted1998 ~ GOTV_call, data=mosaic::resample(turnout_matched))
+
+confint(boot_voted1998_GOTV_matched, level = 0.95)
+
+```
+The proportion of those receiving a GOTV call who voted in 1998 is 0.648, and the proportion of those not receiving a GOTV call who voted in 1998 is 0.574. The 95% confidence interval for the difference in these two proportions is roughly (0.008, 0.140). Since the 95% confidence interval for proportion difference of the matched dataset does not contain zero and is all positive, we can conclude that it is statistically significant -- the main effect of the GOTV call itself is associated with higher likelihood of voting in the 1998 election.
+
+#### Problem2: Manufacturing flaws in circuits boards
+
+##### Part A: Make two plots. The first plot should provide evidence that the size of the opening on the solder gun is related to the number of skips. The second should provide evidence that the thickness of the alloy used for soldering is related to the number of skips. Give each plot an informative caption describing what is shown in the plot.
+
+(1) Plot1: 
+
+```{r, echo = FALSE}
+# Create a faceted histogram with different panels for each opening size
+histogram1 <- ggplot(solder, aes(x = skips)) +
+  geom_histogram(binwidth = 5, fill = "blue", color = "black") +  
+  facet_wrap(~ Opening) +  # Creates a separate histogram for each opening size
+  labs(title = "Histogram of Number of Skips by Opening Size",
+       x = "Number of Skips for Different Opening Size",
+       y = "Frequency") +
+  theme_classic()
+
+print(histogram1)
+
+```
+The above faceted histogram suggests that the size of the opening on the solder gun is related to the number of skips. Overall solder guns with larger opening sizes have a lower median number of skips compared to those with smaller opening sizes.  
+
+(2) Plot2:
+
+```{r, echo = FALSE}
+
+# Create a faceted histogram with different panels for each opening size
+histogram2 <- ggplot(solder, aes(x = skips)) +
+  geom_histogram(binwidth = 5, fill = "aquamarine", color = "black") +  
+  facet_wrap(~ Solder) +  # Creates a separate histogram for each thickness level
+  labs(title = "Histogram of Number of Skips by Alloy Thickness",
+       x = "Number of Skips for Different Alloy Thickness Level",
+       y = "Frequency") +
+  theme_classic()
+
+print(histogram2)
+```
+
+The above faceted histogram suggests that the thickness of the alloy used for soldering is related to the number of skips. Overall solder guns with thick alloy have a lower median number of skips compared to those with thin alloy. 
+
+##### Part B: Build a regression model with skips as the outcome and with the following terms as predictors: a main effect for Opening, a main effect for Solder type, an interaction between Opening and Solder type. Make a table that shows the estimate and 95% large-sample confidence interval for each coefficient in your model.
+```{r, echo = FALSE}
+lm0 <- lm(skips ~ Opening + Solder + Opening:Solder, data = solder)
+coef(lm0) %>% round(2)
+```
+model: predicted skips = 0.39 + 2.41 * OpeningM + 5.13 * OpeningS + 2.28 * SolderThin - 0.74 * OpeningM * SolderThin + 9.65 * OpeningS * SolderThin
+
+```{r, echo = FALSE}
+
+# Bootstrap function
+boot_fn <- function(data, indices) {
+  boot_data <- data[indices, ]
+  model <- lm(skips ~ Opening + Solder + Opening:Solder, data = boot_data)
+  return(coef(model))
+}
+
+# Execute the bootstrap
+set.seed(123)
+boot_results <- boot(data = solder, statistic = boot_fn, R = 1000)
+
+# Compute confidence intervals
+ci_list <- lapply(1:length(boot_results$t0), function(i) {
+  boot.ci(boot_results, type = "bca", index = i)
+})
+
+# Extract the confidence intervals properly
+# Assuming bca method provides the required CI correctly
+ci_output <- sapply(ci_list, function(ci) {
+  if (is.null(ci$bca)) NA else ci$bca[4:5]
+})
+
+# Handling cases where CI might not be available
+ci_output <- t(ci_output) # Transpose to match the coefficients orientation
+rownames(ci_output) <- names(coef(lm0))
+
+# create a new data frame for our table of coefficient stats
+coefficients_df <- data.frame(
+  variable = c("Intercept", "OpeningM", "OpeningS", "SolderThin", "OpeningM * SolderThin", "OpeningS * SolderThin"),
+  estimate = c(0.39, 2.41, 5.13, 2.28, -0.74, 9.65),
+  intervals_0.95 = ci_output
+)
+
+
+coefficient_table <- kable(coefficients_df, format = "html", caption = "Coefficients Table")
+
+coefficient_table
+```
+
+##### Part C: Interpret each estimated coefficient in your model in no more than 1-2 sentences. A good template here is provided in the course packet, when we fit a model for the video games data that had an interaction in it and interpreted each coefficient in a sentence or two.
+
+The baseline number of skips for circuit boards whose opening size is neither M nor S, with alloy for soldering that is not thin is 0.39.
+
+The main effect for the 'OpeningM' variable is 2.41. This is the effect of 'OpeningM' in isolation.
+
+The main effect for the 'OpeningS' variable is 5.13. This is the effect of 'OpeningS' in isolation. 
+
+The main effect for 'SolderThin' is 2.28. This is the effect of 'SolderThin' in isolation.
+
+The interaction effect for 'OpeningM' and 'SolderThin' is -0.74. In other words, circuit boards that have medium sizes of the opening and use thin alloy yield 0.74 less number of skips that what you would expect from summing the individual 'isolated' effects of the two variables.
+
+The interaction effect for 'OpeningS' and 'SolderThin' is -0.74. In other words, circuit boards that have small sizes of the opening and use thin alloy yield 9.65 more number of skips that what you would expect from summing the individual 'isolated' effects of the two variables.
+
+##### Part D: If you had to recommend a combination of Opening size and Solder thickness to AT&T based on this analysis, which one would it be, and why? (Remember, the goal is to minimize the number of skips in the manufacturing process.)
+
+model: predicted skips = 0.39 + 2.41 * OpeningM + 5.13 * OpeningS + 2.28 * SolderThin - 0.74 * OpeningM * SolderThin + 9.65 * OpeningS * SolderThin
+
+(1) L + thick - OpeningM = 0; OpeningS = 0; SolderThin = 0:
+predicted skips = 0.39
+
+(2) M + thick - OpeningM = 1; OpeningS = 0; SolderThin = 0:
+predicted skips = 2.80
+
+(3) S + thick - OpeningM = 0; OpeningS = 1; SolderThin = 0:
+predicted skips = 5.52
+
+(4) L + thin - OpeningM = 0; OpeningS = 0; SolderThin = 1:
+predicted skips = 2.67
+
+(5) M + thin - OpeningM = 1; OpeningS = 0; SolderThin = 1:
+predicted skips = 4.34
+
+(6) S + thin - OpeningM = 0; OpeningS = 1; SolderThin = 1:
+predicted skips = 17.45
+
+Based on the analysis above, I would recommend a combination of large opening size and thick solder thickness to AT&T, as this combination yields the least amount of predicted skips and thus has the best quality.
+
+
