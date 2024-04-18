@@ -98,7 +98,7 @@ summary(turnout_match)
 ```
 
 Repeat analysis from Part A using the matched dataset: 
-```{r}
+```{r, echo = FALSE}
 turnout_matched = match.data(turnout_match)
 # use the matched dataset to calculate some statistics from Part A: 
 prop(voted1998 ~ GOTV_call, data = turnout_matched)
